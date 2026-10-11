@@ -1,0 +1,8 @@
+# Default settings for Xpra HTML5 client on Cloud Workstations
+reconnect = true
+floating_menu = true
+autohide = true
+toolbar_position = top
+clipboard = true
+sound = true
+printing = false

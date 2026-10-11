@@ -1,0 +1,9 @@
+[org.gnome.shell]
+favorite-apps=['google-chrome.desktop', 'org.gnome.Terminal.desktop']
+
+[org.gnome.desktop.screensaver]
+lock-enabled=false
+idle-activation-enabled=false
+
+[org.gnome.desktop.session]
+idle-delay=uint32 0

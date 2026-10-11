@@ -1,0 +1,13 @@
+# Default settings for Xpra HTML5 client on Cloud Run
+reconnect = true
+floating_menu = true
+autohide = true
+toolbar_position = top
+clipboard = true
+sound = true
+printing = false
+desktop_scaling = off
+encoding = jpeg
+quality = 75
+speed = 90
+offscreen = true

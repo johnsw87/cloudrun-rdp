@@ -1,0 +1,24 @@
+[Unit]
+Description=Xpra HTML5 GNOME Desktop Forwarding Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=user
+Group=users
+PAMName=login
+Environment=HOME=/home/user
+Environment=USER=user
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ExecStartPre=+/bin/bash -c 'mkdir -p /run/user/1000 && chown 1000:users /run/user/1000 && chmod 0700 /run/user/1000'
+ExecStartPre=-/usr/bin/xpra stop :100
+ExecStart=/usr/local/bin/start-xpra-gnome.sh
+ExecStop=-/usr/bin/xpra stop :100
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

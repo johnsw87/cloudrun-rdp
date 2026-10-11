@@ -1,0 +1,15 @@
+options:
+  substitutionOption: MUST_MATCH
+
+steps:
+- id: pull-cache-xpra-chrome
+  name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args: ['-c', 'docker pull ${_IMAGE_NAME} || exit 0']
+- id: build-cloud-run-xpra-chrome
+  name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--build-arg', 'BUILDKIT_INLINE_CACHE=1', '--cache-from', '${_IMAGE_NAME}', '-t', '${_IMAGE_NAME}', '.']
+  env:
+    - "DOCKER_BUILDKIT=1"
+
+images: ['${_IMAGE_NAME}']
