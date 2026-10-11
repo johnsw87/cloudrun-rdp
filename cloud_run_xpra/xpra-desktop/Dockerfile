@@ -69,7 +69,7 @@ RUN wget -q -O /tmp/google-chrome-stable_current_amd64.deb \
   rm /tmp/google-chrome-stable_current_amd64.deb && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
-  sed -i 's|exec -a "\$0" "\$HERE/chrome" "\$@"|exec -a "$0" "$HERE/chrome" --no-sandbox --disable-gpu --disable-gpu-compositing --disable-software-rasterizer --autoplay-policy=no-user-gesture-required --no-first-run --no-default-browser-check --disable-background-networking --disable-sync --disable-translate --disable-dev-tools --hide-crash-restore-bubble "$@"|' /opt/google/chrome/google-chrome && \
+  sed -i 's|exec -a "\$0" "\$HERE/chrome" "\$@"|export XDG_RUNTIME_DIR="/tmp/runtime-user" PULSE_SERVER="unix:/tmp/runtime-user/pulse/native" PULSE_SINK="Xpra-Speaker" PULSE_SOURCE="Xpra-Speaker.monitor" DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/runtime-user/bus" DBUS_SYSTEM_BUS_ADDRESS="unix:path=/tmp/runtime-user/bus"\nexec -a "$0" "$HERE/chrome" --no-sandbox --disable-gpu --disable-gpu-compositing --disable-software-rasterizer --autoplay-policy=no-user-gesture-required --no-first-run --no-default-browser-check --disable-background-networking --disable-sync --disable-translate --disable-dev-tools --hide-crash-restore-bubble "$@"|' /opt/google/chrome/google-chrome && \
   update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/google-chrome-stable 200 && \
   update-alternatives --set x-www-browser /usr/bin/google-chrome-stable
 
@@ -87,8 +87,13 @@ RUN if [ -d /usr/share/xpra/www ]; then \
       ln -sf /etc/xpra/html5-client/default-settings.txt /usr/share/xpra/www/default-settings.txt; \
     fi
 
-# Create unprivileged runtime user (Ubuntu 24.04 already assigns UID 1000 to 'ubuntu')
-RUN useradd -m -s /bin/bash user
+# Create unprivileged runtime user, configure system-wide PulseAudio client
+# defaults so all desktop/D-Bus/browser subprocesses route audio to Xpra-Speaker,
+# and remove XDG autostart pulseaudio launcher so XFCE4 does not interfere
+RUN useradd -m -s /bin/bash user && \
+    mkdir -p /run/dbus && chown user:user /run/dbus && \
+    rm -f /etc/xdg/autostart/pulseaudio.desktop && \
+    printf "default-sink = Xpra-Speaker\ndefault-source = Xpra-Speaker.monitor\nautospawn = no\n" > /etc/pulse/client.conf
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

@@ -51,6 +51,13 @@ def patch_pactl_impl(path: pathlib.Path) -> None:
     return
   content = path.read_text(encoding="utf-8")
   changed = False
+  if 'is_monitor = device_class == \'"monitor"\'' in content:
+    content = content.replace(
+        'is_monitor = device_class == \'"monitor"\'',
+        'is_monitor = device_class.strip(\'"\') == "monitor"',
+    )
+    changed = True
+
   if 'line.removeprefix("device-class = ")' in content:
     content = content.replace(
         'line.removeprefix("device-class = ")',
@@ -71,12 +78,40 @@ def patch_pactl_impl(path: pathlib.Path) -> None:
     )
     changed = True
 
+  flush_tail = (
+      "    if in_source_section and are_properties_acceptable(name, device_class, monitor_of_sink):\n"
+      "        devices[name] = device_description or name\n"
+      "    return devices\n"
+  )
+  if flush_tail not in content and "    return devices\n" in content:
+    content = content.replace("    return devices\n", flush_tail, 1)
+    changed = True
+
   if changed:
     path.write_text(content, encoding="utf-8")
     py_compile.compile(str(path), doraise=True)
     print(f"Patched PulseAudio pactl parser in {path}")
   else:
     print(f"PulseAudio pactl parser already clean in {path}")
+
+  # Self-test do_get_pa_device_options against PulseAudio 16.1 `pactl list` output
+  from xpra.audio.pulseaudio.pactl_impl import do_get_pa_device_options  # pylint: disable=import-outside-toplevel
+  sample_pactl_output = (
+      "Source #0\n"
+      "\tState: IDLE\n"
+      "\tName: Xpra-Speaker.monitor\n"
+      "\tDescription: Monitor of Xpra-Speaker\n"
+      "\tMonitor of Sink: Xpra-Speaker\n"
+      "\tProperties:\n"
+      '\t\tdevice.description = "Monitor of Xpra-Speaker"\n'
+      '\t\tdevice.class = "monitor"\n'
+  )
+  detected = do_get_pa_device_options(sample_pactl_output, True, False)
+  if detected != {"Xpra-Speaker.monitor": "Monitor of Xpra-Speaker"}:
+    raise RuntimeError(
+        f"do_get_pa_device_options self-test failed: got {detected!r}"
+    )
+  print(f"Verified do_get_pa_device_options self-test: {detected}")
 
 
 AUDIO_START_STREAM_OVERRIDE = """
@@ -110,7 +145,7 @@ XpraClient.prototype._audio_start_stream = function() {
           if (!self._autoplay_unlock_registered) {
             self._autoplay_unlock_registered = true;
             var events = ["pointerdown", "mousedown", "keydown", "touchstart"];
-            var unlock = function() {
+            var unlock = function(evt) {
               for (var i = 0; i < events.length; i++) {
                 window.removeEventListener(events[i], unlock, true);
               }
@@ -118,7 +153,11 @@ XpraClient.prototype._audio_start_stream = function() {
               if (self.audio_context && self.audio_context.state === "suspended") {
                 self.audio_context.resume().catch(function() {});
               }
-              if (self.connected && self.audio_enabled && self.audio_state !== "playing") {
+              if (evt && evt.target && evt.target.closest && evt.target.closest("#sound_button")) {
+                return;
+              }
+              if (self.connected && self.audio_enabled && self.audio_state !== "playing" && self.audio_state !== "waiting") {
+                self.on_audio_state_change("waiting", "autoplay unlock");
                 self._sound_start_receiving();
               }
             };
