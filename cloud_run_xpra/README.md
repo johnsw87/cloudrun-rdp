@@ -48,3 +48,7 @@ Because the service is deployed with `--no-allow-unauthenticated`, protect it be
 ```bash
 gcloud run services proxy xpra-chrome --project="${PROJECT_ID}" --region="${REGION}" --port=8080
 ```
+
+## License & Third-Party Software
+- Repository build definitions, scripts, and configurations are licensed under the **[Apache License 2.0](../LICENSE)**.
+- See **[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md)** for license details on components installed during `docker build` (including Xpra `GPL-2.0-or-later`, Xpra HTML5 `MPL-2.0`, XFCE4/PulseAudio/GStreamer `GPL/LGPL`, and the [Google Chrome Terms of Service](https://www.google.com/chrome/terms/)).

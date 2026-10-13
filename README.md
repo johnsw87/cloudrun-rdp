@@ -110,3 +110,11 @@ gcloud beta run deploy "${SERVICE_NAME}" \
 ## Quickstart: Google Cloud Workstations (`cloud_workstations_xpra/`)
 
 See [`cloud_workstations_xpra/README.md`](./cloud_workstations_xpra/README.md) for instructions on building and configuring the `xpra-chrome` and `xpra-gnome` images with a Cloud Workstations cluster and configuration.
+
+---
+
+## License & Third-Party Software
+
+- Repository build definitions, scripts, and configurations are licensed under the **[Apache License 2.0](./LICENSE)**.
+- Build-time patches applied to Xpra server Python files (`patch_xpra_desktop_resize.py`, `patch_xpra_audio.py`) are covered by **GPL-2.0-or-later**, and patches to Xpra HTML5 (`Client.js`) are covered by **MPL-2.0**.
+- See **[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)** for full license details on all third-party components installed during `docker build` (including Xpra, XFCE4, PulseAudio, GStreamer, Google Cloud CLI, and the [Google Chrome Terms of Service](https://www.google.com/chrome/terms/)).
