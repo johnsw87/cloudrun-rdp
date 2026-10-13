@@ -12,6 +12,14 @@ export XDG_RUNTIME_DIR="/tmp/runtime-user"
 mkdir -p "${XDG_RUNTIME_DIR}"
 chmod 0700 "${XDG_RUNTIME_DIR}"
 
+# Restore persistent user, desktop, gcloud, ssh & browser state from GCS Fuse mount (if mounted at $GCS_STATE_MOUNT_PATH)
+export GCS_STATE_MOUNT_PATH="${GCS_STATE_MOUNT_PATH:-/mnt/state}"
+python3 /usr/local/bin/sync_gcs_state.py init || true
+if [ -d "${GCS_STATE_MOUNT_PATH}" ] && [ -w "${GCS_STATE_MOUNT_PATH}" ]; then
+  python3 /usr/local/bin/sync_gcs_state.py daemon &
+  GCS_SYNC_PID=$!
+fi
+
 # Start an unprivileged PulseAudio server with a single Xpra-Speaker null sink
 # (without module-suspend-on-idle so the monitor stream never stalls).
 # Note: PULSE_SERVER must be exported AFTER pulseaudio starts so pulseaudio
@@ -68,7 +76,24 @@ EOF
 
 LISTEN_PORT="${PORT:-8080}"
 
-exec /usr/bin/xpra start-desktop :100 \
+cleanup() {
+  echo "[entrypoint] Caught shutdown signal, stopping Xpra and flushing state to GCS..."
+  if [ -n "${XPRA_PID:-}" ] && kill -0 "${XPRA_PID}" 2>/dev/null; then
+    kill -TERM "${XPRA_PID}" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6; do
+      kill -0 "${XPRA_PID}" 2>/dev/null || break
+      sleep 0.5
+    done
+  fi
+  if [ -n "${GCS_SYNC_PID:-}" ] && kill -0 "${GCS_SYNC_PID}" 2>/dev/null; then
+    kill -TERM "${GCS_SYNC_PID}" 2>/dev/null || true
+  fi
+  python3 /usr/local/bin/sync_gcs_state.py sync || true
+  exit 0
+}
+trap cleanup SIGTERM SIGINT
+
+/usr/bin/xpra start-desktop :100 \
   --xvfb=Xdummy \
   --bind-tcp="0.0.0.0:${LISTEN_PORT}" \
   --html=on \
@@ -104,4 +129,8 @@ exec /usr/bin/xpra start-desktop :100 \
   --printing=no \
   --bell=no \
   --notifications=no \
-  --start-child="env DBUS_SESSION_BUS_ADDRESS=unix:path=${DBUS_SOCK} DBUS_SYSTEM_BUS_ADDRESS=unix:path=${DBUS_SOCK} PULSE_SERVER=unix:${PULSE_RUNTIME_PATH}/native PULSE_SINK=Xpra-Speaker PULSE_SOURCE=Xpra-Speaker.monitor xfce4-session"
+  --start-child="env DBUS_SESSION_BUS_ADDRESS=unix:path=${DBUS_SOCK} DBUS_SYSTEM_BUS_ADDRESS=unix:path=${DBUS_SOCK} PULSE_SERVER=unix:${PULSE_RUNTIME_PATH}/native PULSE_SINK=Xpra-Speaker PULSE_SOURCE=Xpra-Speaker.monitor xfce4-session" &
+XPRA_PID=$!
+wait "${XPRA_PID}" || true
+python3 /usr/local/bin/sync_gcs_state.py sync || true
+

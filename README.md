@@ -27,6 +27,10 @@ Container images for running a **remote Linux desktop** or **seamless Google Chr
    - Runs an unprivileged PulseAudio server with a dedicated `Xpra-Speaker` null sink (without `module-suspend-on-idle` so the audio clock never stalls).
    - Streams audio over HTML5 MediaSource (`mp3` / `wav`) with `--av-sync=off` so screen frames are never delayed by audio buffering.
    - Includes `patch_xpra_audio.py` to automatically unlock Chrome's Web Autoplay Policy on the user's first click or keypress inside the remote session.
+4. **Persistent State Store with Cloud Storage (GCS Fuse):**
+   - Supports mounting a Cloud Storage bucket at `/mnt/state` via Cloud Run Gen2 GCS Fuse (`sync_gcs_state.py`).
+   - Directly symlinks `~/Downloads`, `~/Documents`, `~/Desktop`, and `~/Workspace` to `/mnt/state/...` for immediate file persistence without consuming container memory.
+   - Restores `~/.config/google-chrome`, `~/.config/gcloud`, `~/.ssh`, `~/.config/xfce4`, and `~/.bash_history` into fast local memory on startup, incrementally syncs modified files every 15s using SHA-256 deduplication (skipping ephemeral caches/sockets/locks), and flushes state on `SIGTERM` shutdown.
 
 ---
 
@@ -65,11 +69,18 @@ gcloud builds submit ./cloud_run_xpra/xpra-desktop \
   --substitutions="_IMAGE_NAME=${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/xpra-desktop:latest"
 ```
 
-### 4. Deploy to Cloud Run (Gen2)
-Choose a container (`xpra-chrome` or `xpra-desktop`) and deploy with **Gen2 execution environment**, **CPU always allocated** (`--no-cpu-throttling`), **session affinity**, and **IAP** enabled:
+### 4. Deploy to Cloud Run (Gen2) with Persistent GCS Fuse State
+Create a Cloud Storage bucket for persistent state (optional but recommended), then deploy `xpra-desktop` or `xpra-chrome` with **Gen2 execution environment**, **GCS Fuse volume mount**, **CPU always allocated** (`--no-cpu-throttling`), **session affinity**, and **IAP** enabled:
 
 ```bash
+export STATE_BUCKET="${PROJECT_ID}-rdp-state"
 SERVICE_NAME="xpra-desktop" # or "xpra-chrome"
+
+# Create state bucket (once per project)
+gcloud storage buckets create "gs://${STATE_BUCKET}" \
+  --project="${PROJECT_ID}" \
+  --location="${REGION}" \
+  --uniform-bucket-level-access
 
 gcloud beta run deploy "${SERVICE_NAME}" \
   --project="${PROJECT_ID}" \
@@ -83,6 +94,9 @@ gcloud beta run deploy "${SERVICE_NAME}" \
   --concurrency=80 \
   --max-instances=1 \
   --timeout=3600 \
+  --add-volume=name=gcs-state,type=cloud-storage,bucket="${STATE_BUCKET}",mount-options="implicit-dirs;uid=1001;gid=1001;file-mode=0666;dir-mode=0777" \
+  --add-volume-mount=volume=gcs-state,mount-path=/mnt/state \
+  --set-env-vars="GCS_STATE_MOUNT_PATH=/mnt/state" \
   --iap \
   --no-allow-unauthenticated
 ```

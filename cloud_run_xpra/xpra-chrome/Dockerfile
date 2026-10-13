@@ -94,8 +94,10 @@ RUN if [ -d /usr/share/xpra/www ]; then \
       ln -sf /etc/xpra/html5-client/default-settings.txt /usr/share/xpra/www/default-settings.txt; \
     fi
 
+COPY sync_gcs_state.py /usr/local/bin/sync_gcs_state.py
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/sync_gcs_state.py /usr/local/bin/entrypoint.sh && \
+    python3 /usr/local/bin/sync_gcs_state.py --self-test
 
 USER user
 WORKDIR /home/user
