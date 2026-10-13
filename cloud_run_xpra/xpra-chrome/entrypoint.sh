@@ -87,4 +87,4 @@ exec /usr/bin/xpra start :100 \
   --printing=no \
   --bell=no \
   --notifications=no \
-  --start-child="/usr/bin/google-chrome-stable --no-sandbox --no-first-run --no-default-browser-check --hide-crash-restore-bubble --start-maximized"
+  --start-child="/usr/bin/google-chrome-stable --no-sandbox --test-type --no-first-run --no-default-browser-check --hide-crash-restore-bubble --start-maximized"

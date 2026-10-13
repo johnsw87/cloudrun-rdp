@@ -9,7 +9,7 @@ Serverless adaptations of the Xpra HTML5 containers designed for **Google Cloud 
 | **Init / PID 1** | Runs full `systemd` (`/sbin/init`) inside a dedicated GCE VM | Cloud Run controls PID 1 (`systemd` cannot boot); uses a single session/system `dbus-daemon` + foreground `xpra --daemon=no` |
 | **Desktop Environment** | Ubuntu GNOME (`gnome-shell` via `systemd-logind`) | **XFCE4 (`xfce4-session`)** with `xfwm4` compositing disabled + X11 `MIT-SHM` enabled |
 | **Port** | Port `80` | `$PORT` (default `8080`) |
-| **Chrome Sandbox** | Standard userns sandbox | Requires `--no-sandbox` inside Cloud Run's container sandbox |
+| **Chrome Sandbox** | Standard userns sandbox | Requires `--no-sandbox --test-type` inside Cloud Run's container sandbox |
 | **Virtual Audio Driver** | PulseAudio virtual sink (`Xpra-Speaker`) + GStreamer (`opus+mka`) streamed via HTML5 MediaSource | Unprivileged PulseAudio (`Xpra-Speaker` null sink without suspend-on-idle) + GStreamer (`mp3` / `wav`, `--av-sync=off`) with automatic HTML5 autoplay unlock on first click/keypress |
 | **Session State** | 1 dedicated VM + Persistent Disk per user | Requires `--max-instances=1`, `--concurrency=80` (so parallel HTML5 JS/CSS asset loads + WebSocket stream don't hit HTTP 429), `--session-affinity`, `--no-cpu-throttling`, and `--timeout=3600` |
 
