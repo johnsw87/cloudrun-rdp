@@ -87,6 +87,32 @@ EXCLUDED_SUFFIXES = (
     ".pma",
 )
 
+# Restrict ~/.config/google-chrome sync to user profile state (skipping ~450 Chrome Component Updater files)
+CHROME_ALLOWED_TOP_DIRS = {"Default"}
+CHROME_ALLOWED_TOP_FILES = {"Local State", "First Run"}
+CHROME_ALLOWED_DEFAULT_DIRS = {
+    "Network",
+    "Local Storage",
+    "Session Storage",
+    "Extensions",
+    "Local Extension Settings",
+    "Sync Extension Settings",
+    "Managed Extension Settings",
+    "IndexedDB",
+}
+
+
+def filter_walk_entries(target_name: str, rel_dir: str, dirs: list, files: list, root: str) -> tuple[list, list]:
+    dirs = [d for d in dirs if d not in EXCLUDED_DIR_NAMES and not os.path.islink(os.path.join(root, d))]
+    files = [f for f in files if not should_exclude_file(f)]
+    if target_name == "chrome":
+        if rel_dir == ".":
+            dirs = [d for d in dirs if d in CHROME_ALLOWED_TOP_DIRS]
+            files = [f for f in files if f in CHROME_ALLOWED_TOP_FILES]
+        elif rel_dir == "Default":
+            dirs = [d for d in dirs if d in CHROME_ALLOWED_DEFAULT_DIRS]
+    return dirs, files
+
 
 def log(msg: str) -> None:
     print(f"[gcs-state] {msg}", flush=True)
@@ -272,14 +298,12 @@ def init_state(home_dir: str = HOME_DIR, mount_path: str = MOUNT_PATH, profile_k
             continue
 
         for root, dirs, files in os.walk(gcs_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDED_DIR_NAMES]
             rel_dir = os.path.relpath(root, gcs_path)
+            dirs[:], files = filter_walk_entries(name, rel_dir, dirs, files, root)
             target_dir = local_path if rel_dir == "." else os.path.join(local_path, rel_dir)
             os.makedirs(target_dir, exist_ok=True)
 
             for fname in files:
-                if should_exclude_file(fname):
-                    continue
                 src_file = os.path.join(root, fname)
                 dst_file = os.path.join(target_dir, fname)
                 rel_file = fname if rel_dir == "." else os.path.join(rel_dir, fname)
@@ -345,12 +369,10 @@ def sync_state(home_dir: str = HOME_DIR, mount_path: str = MOUNT_PATH, profile_k
             continue
 
         for root, dirs, files in os.walk(local_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDED_DIR_NAMES and not os.path.islink(os.path.join(root, d))]
             rel_dir = os.path.relpath(root, local_path)
+            dirs[:], files = filter_walk_entries(name, rel_dir, dirs, files, root)
 
             for fname in files:
-                if should_exclude_file(fname):
-                    continue
                 src_file = os.path.join(root, fname)
                 try:
                     st = os.lstat(src_file)
